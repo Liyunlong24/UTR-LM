@@ -1,0 +1,46 @@
+name: utr
+channels:
+  - conda-forge
+  - bioconda
+  - pytorch
+  - nvidia
+dependencies:
+  - conda-forge::python=3.9
+  - conda-forge::libgcc=7.2
+  - conda-forge::setuptools=68.2.2
+  - conda-forge::pip
+  - conda-forge::pytorch-lightning=2.3.0
+  - conda-forge::biopython=1.79
+  - conda-forge::numpy=1.26.0
+  - conda-forge::pandas=2.1.1
+  - conda-forge::PyYAML=5.4.1
+  - conda-forge::requests=2.26.0
+  - conda-forge::scipy=1.11.3
+  - conda-forge::scikit-learn=1.3.1
+  - conda-forge::tqdm=4.62.2
+  - conda-forge::typing-extensions=4.6.3
+  - conda-forge::modelcif=0.7
+  - conda-forge::wandb=0.15.12
+  - conda-forge::ipython
+  - conda-forge::jupyterlab
+  - conda-forge::notebook
+  - packaging=23.2
+  - mkl==2022.1.0
+  - ml-collections=0.1.1
+  - git
+  - kaggle=1.5.16
+  - bioconda::abnumber
+  - pytorch::pytorch==2.1.0
+  - pytorch::pytorch-cuda==12.1
+  - cuda-toolkit=12.1
+  - pip:
+      - deepspeed==0.12.4
+      - dm-tree==0.1.6
+      - easydict
+      - dill
+      - biopandas
+      - transformers
+      - ninja==1.11.1.1
+      - einops==0.7.0
+     # - flash-attn==2.3.2
+      - gdown==5.2.0
