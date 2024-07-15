@@ -21,7 +21,7 @@ bash bash/ribosome_loading_finuetuning.sh
 ```bash
 bash bash/teel_finuxtuning.sh
 ```
-Which Parameters you MUST to define:\
+Which Parameters you MUST to define:
 * task_type: Choose from "te_log" (TE task) or "rnaseq_log" (EL task)
 ### SecStructPrediction
 ```bash
