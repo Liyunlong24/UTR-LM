@@ -11,12 +11,12 @@ from utr.data.alphabet import Alphabet
 from utr.data.downstream.teel.dataset import TeelDataset
 from utr.utils.download import download_ribosome_loading_data
 
-#VARYING_LEN_25_TO_100_CSV = "GSM4084997_varying_length_25to100.csv.gz"
-
 class TeelDataModule(pl.LightningDataModule):
     def __init__(
         self,
+        #task_type: str = 'TE',
         data_root: Union[Path, str],
+        task_type: str = 'TE',
         alphabet: Alphabet = Alphabet(),
         batch_size: int = 1,
         num_workers: int = 0,
@@ -24,7 +24,7 @@ class TeelDataModule(pl.LightningDataModule):
         skip_data_preparation: bool = True,
     ):
         super().__init__()
-
+        self.task_type = task_type
         self.data_root = Path(data_root)
         self.alphabet = alphabet
 
@@ -41,8 +41,7 @@ class TeelDataModule(pl.LightningDataModule):
             self._data_prepared = True
 
     def setup(self, stage: Optional[str] = None):
-        dataset = TeelDataset(self.data_root, alphabet=self.alphabet)
-        #print(self.data_root / VARYING_LEN_25_TO_100_CSV)
+        dataset = TeelDataset(self.data_root, alphabet=self.alphabet, self.task_type)
 
         self.train_dataset, self.val_dataset, self.test_dataset = dataset.train_eval_split()
 

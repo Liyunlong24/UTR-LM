@@ -1,6 +1,6 @@
 # UTR model pre-training and downstream task fine-tuning
 ## Introduction
-The untranslated region (UTR) of an RNA molecule plays a vital role in gene expression regulation. Specifically, the 5' UTR, located at the 5' end of an RNA molecule, is a critical determinant of the RNA’s translation efficiency. Language models have demonstrated their utility in predicting and optimizing the function of protein encoding sequences and genome sequences. In this study, we developed a semi-supervised language model for 5’ UTR, which is pre-trained on a combined library of random 5' UTRs and endogenous 5' UTRs from multiple species. 
+The untranslated region (UTR) of RNA molecules plays a crucial role in the regulation of gene expression. Specifically, the 5' UTR located at the 5' end of the RNA molecule is a key factor in determining the efficiency of RNA translation. This project developed a semi-supervised language model of 5' UTRs that was pretrained on a combined library of random 5' UTRs and endogenous 5' UTRs from multiple species. On the basis of the pre-trained model, some downstream tasks (MRL, TE, EL, SecStructPrediction) were fine-tuned to finally achieve the prediction effect.
 ## Project progress
 
 At present, pre-training and fine-tuning for downstream tasks (MRL, TE, EL, SecStructPrediction) have been completed.
@@ -22,7 +22,7 @@ bash bash/ribosome_loading_finuetuning.sh
 bash bash/teel_finuxtuning.sh
 ```
 Which Parameters you MUST to define:\
-·task_type: Choose from "te_log" (TE task) or "rnaseq_log" (EL task)
+* task_type: Choose from "te_log" (TE task) or "rnaseq_log" (EL task)
 ### SecStructPrediction
 ```bash
 bash bash/ss_fine_tuning.sh

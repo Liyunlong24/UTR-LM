@@ -30,6 +30,7 @@ class TeelDataset(Dataset):
             self,
             mrl_csv: Union[str, Path],
             alphabet: Alphabet,
+            task_type:str = 'TE',
             pad_to_max_len: bool = True,
     ):
         super().__init__()
@@ -38,7 +39,7 @@ class TeelDataset(Dataset):
         self.df.dropna(subset=['te_log'], inplace=True)  # Remove entries with missing ribosome loading value
 
         self.alphabet = alphabet
-
+        self.task_type = task_type
         self.max_enc_seq_len = -1
         if pad_to_max_len:
             self.max_enc_seq_len = self.df['utr'].str.len().max() + 2
@@ -47,12 +48,15 @@ class TeelDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
+        assert self.task_type =='TE' or self.task_type == 'EL' , 'task_type must be TE or EL'
         df_row = self.df.iloc[idx]
 
         seq = df_row['utr']
         seq_encoded = torch.tensor(self.alphabet.encode(seq, pad_to_len=self.max_enc_seq_len), dtype=torch.long)
-
-        rl = torch.tensor(df_row['te_log'], dtype=torch.float32)
+        if self.task_type == 'TE':
+            rl = torch.tensor(df_row['te_log'], dtype=torch.float32)
+        elif self.task_type == 'EL':
+            rl = torch.tensor(df_row['rnaseq_log'], dtype=torch.float32)
 
         return seq_encoded, rl
     def train_eval_split(self, val_size: float = 0.2, test_size: float = 0.1):

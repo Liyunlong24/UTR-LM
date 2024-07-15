@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 #export PYTHONPATH=/home/yunlongli/code/RiNALMo:$PYTHONPATH
 
-seed=2024
 mkdir -p '/home/yunlongli/code/RiNALMo/output/sec_struct_prediction/logs'
 CUDA_VISIBLE_DEVICES="2,3" python3 \
     train_sec_struct_prediction.py \
@@ -11,6 +10,7 @@ CUDA_VISIBLE_DEVICES="2,3" python3 \
     --accelerator gpu \
     --data_dir ./rinalmo/data/downstream/secondary_structure/ss_data \
     --max_epochs 5 \
+    --seed 2024 \
     --wandb \
     --wandb_version v2 \
     --wandb_experiment_name ss \

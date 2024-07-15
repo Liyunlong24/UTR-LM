@@ -196,6 +196,7 @@ def main(args):
     alphabet = Alphabet()
     datamodule = TeelDataModule(
         data_root=args.data_dir,
+        task_type=args.task_type,
         alphabet=alphabet,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
@@ -221,7 +222,7 @@ def main(args):
     if args.checkpoint_every_epoch:
         epoch_ckpt_callback = ModelCheckpoint(
             dirpath=args.output_dir,
-            filename='teel-epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
+            filename='teel-ss-epoch_ckpt-{epoch}-{step}',
             every_n_epochs=1,
             save_top_k=-1
         )
@@ -386,6 +387,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--precision", type=str, default='16-mixed',
         help="Double precision, full precision, 16bit mixed precision or bfloat16 mixed precision"
+    )
+    parser.add_argument(
+        "--task_type", type=str, required=True,
+        help="Double precision, full precision, 16bit mixed precision or bfloat16 mixed precision"#需要修改
     )
 
     args = parser.parse_args()

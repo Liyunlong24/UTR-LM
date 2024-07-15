@@ -3,11 +3,9 @@
 import torch
 import torch.nn as nn
 from utr.model.model import RiNALMo
-from utr.model.downstream import SecStructPredictionHead
+
 from utr.config import model_config
 from utr.data.alphabet import Alphabet
-from utr.utils.sec_struct import prob_mat_to_sec_struct, ss_precision, ss_recall, ss_f1, save_to_ct
-from pathlib import Path
 from utr.model.downstream import RibosomeLoadingPredictionHead
 from utr.utils.scaler import StandardScaler
 from torchmetrics.regression import R2Score
