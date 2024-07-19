@@ -41,7 +41,7 @@ class TeelDataModule(pl.LightningDataModule):
             self._data_prepared = True
 
     def setup(self, stage: Optional[str] = None):
-        dataset = TeelDataset(self.data_root, alphabet=self.alphabet, self.task_type)
+        dataset = TeelDataset(self.data_root, alphabet=self.alphabet, task_type=self.task_type)
 
         self.train_dataset, self.val_dataset, self.test_dataset = dataset.train_eval_split()
 

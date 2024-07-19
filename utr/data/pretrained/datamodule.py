@@ -94,7 +94,6 @@ class PretrainedDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=utrlm_BatchConverter(self.tokenizer, self.max_len),
         )
-        #print(dl)
 
         return dl
 

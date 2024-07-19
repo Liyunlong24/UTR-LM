@@ -12,6 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.strategies import DDPStrategy
 
 from torchmetrics.regression import R2Score
+from torchmetrics import PearsonCorrCoef, SpearmanCorrCoef
 
 import argparse
 from pathlib import Path
@@ -47,6 +48,8 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
 
         self.loss = nn.MSELoss()
         self.r2_metric = R2Score()
+        self.pearson = PearsonCorrCoef()
+        self.spearman = SpearmanCorrCoef()
 
         self.lr = lr
 
@@ -112,6 +115,9 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         mae = F.l1_loss(preds, rl_target)
         self.r2_metric.update(preds, rl_target)
 
+        self.pearson.update(preds, rl_target)
+        self.spearman.update(preds, rl_target)
+
         log = {
             f'{log_prefix}/loss': loss,
             f'{log_prefix}/mse': mse,
@@ -127,13 +133,18 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
     def _on_eval_epoch_start(self):
         # Reset metric calculator
         self.r2_metric.reset()
+        self.pearson.reset()
+        self.spearman.reset()
 
     def _on_eval_epoch_end(self, log_prefix: str):
         # Log and reset metric calculator
         if not self.trainer.sanity_checking:
             self.log(f"{log_prefix}/r2", self.r2_metric.compute(), sync_dist=True)
+            self.log(f"{log_prefix}/pearson", self.pearson.compute(), sync_dist=True)
+            self.log(f"{log_prefix}/spearman", self.spearman.compute(), sync_dist=True)
             self.r2_metric.reset()
-
+            self.pearson.reset()
+            self.spearman.reset()
     def training_step(self, batch, batch_idx):
         if self.current_epoch == 0:
             self.fit_scaler(batch)
@@ -217,13 +228,18 @@ def main(args):
         )
         loggers.append(wandb_logger)
 
+    dirpath = args.output_dir + 'checkpoints'
     if args.checkpoint_every_epoch:
         epoch_ckpt_callback = ModelCheckpoint(
-            dirpath=args.output_dir,
-            filename='mrl-epoch_ckpt-{epoch}-{step}',
+            dirpath=dirpath,
+            filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
             #filename="epoch{epoch:02d}-step{step}-loss={val/loss:.3f}",
+            auto_insert_metric_name=False,
             every_n_epochs=1,
-            save_top_k=-1
+            save_top_k=10,
+            monitor="val/loss",
+            mode="min",
+            save_last = False,
         )
         callbacks.append(epoch_ckpt_callback)
 

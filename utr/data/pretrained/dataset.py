@@ -73,7 +73,6 @@ class PretrainedDataset(Dataset):
 
         inputs, labels, masked_indices = self.mask_tokens(inputs)  # (L, ), (L, )
 
-        #return inputs, labels, masked_indices
 
         return inputs, labels, masked_indices, input_desc
 

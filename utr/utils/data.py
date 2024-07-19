@@ -360,7 +360,7 @@ class utrlm_BatchConverter(object):
         )
         tokens.fill_(self.alphabet.padding_idx)
         label_tokens = -1 * torch.ones_like(tokens)
-        label_secstr = -1 * torch.ones_like(tokens)
+        #label_secstr = -1 * torch.ones_like(tokens)
         mask_indices = torch.zeros_like(tokens).to(torch.bool)
         
 
@@ -389,30 +389,30 @@ class utrlm_BatchConverter(object):
                 + int(self.alphabet.prepend_bos),
             ] = masked_indices
 
-            label_ss = input_desc.split('|')[1]
-            label_ss = [self.structure_tok_to_idx[c] for c in label_ss]
-            if self.truncation_seq_length:
-                label_ss = label_ss[:self.truncation_seq_length]
+            #label_ss = input_desc.split('|')[1]
+           # label_ss = [self.structure_tok_to_idx[c] for c in label_ss]
+            #if self.truncation_seq_length:
+             #   label_ss = label_ss[:self.truncation_seq_length]
             #assert len(label_ss) == len(seq_encoded), f"{len(label_ss)}, {label_ss}, {len(seq_encoded)}, {seq_encoded}"
-            label_secstr[
-                i,
-                int(self.alphabet.prepend_bos): len(label_ss)
-                + int(self.alphabet.prepend_bos),
-            ] = torch.tensor(label_ss).to(torch.int64)
+            #label_secstr[
+              #  i,
+                #int(self.alphabet.prepend_bos): len(label_ss)
+              #  + int(self.alphabet.prepend_bos),
+           # ] = torch.tensor(label_ss).to(torch.int64)
 
             if self.alphabet.append_eos:
                 tokens[i, len(seq_encoded) + int(self.alphabet.prepend_bos)] = self.alphabet.eos_idx
                 # label_tokens[i, len(label_seq_encoded) + int(self.alphabet.prepend_bos)] = self.alphabet.eos_idx
                 # mask_indices[i, len(masked_indices) + int(self.alphabet.prepend_bos)] = 0
-        label_energy = torch.FloatTensor([eval(l.split('|')[-1]) for l in batch_input_desc])
+        #label_energy = torch.FloatTensor([eval(l.split('|')[-1]) for l in batch_input_desc])
 
         return {
             "tokens": tokens,
             "label_tokens": label_tokens,
             "mask_indices": mask_indices,
-            "label_energy": label_energy,
-            "label_secstr": label_secstr,
-            "batch_input_desc": batch_input_desc,
+           # "label_energy": label_energy,
+            #"label_secstr": label_secstr,
+           # "batch_input_desc": batch_input_desc,
         }
 
 

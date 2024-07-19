@@ -9,7 +9,9 @@ from utr.data.alphabet import Alphabet
 from utr.data.downstream.ribosome_loading.dataset import RibosomeLoadingDataset
 from utr.utils.download import download_ribosome_loading_data
 
-VARYING_LEN_25_TO_100_CSV = "GSM4084997_varying_length_25to100.csv.gz"
+TRAIN_PATH = "4.1_train.csv"
+VAL_PATH = "4.1_val_test.csv"
+TEST_PATH = "4.1_val_test.csv"
 
 class RibosomeLoadingDataModule(pl.LightningDataModule):
     def __init__(
@@ -39,9 +41,10 @@ class RibosomeLoadingDataModule(pl.LightningDataModule):
             self._data_prepared = True
 
     def setup(self, stage: Optional[str] = None):
-        dataset = RibosomeLoadingDataset(self.data_root / VARYING_LEN_25_TO_100_CSV, alphabet=self.alphabet)
-        print(self.data_root / VARYING_LEN_25_TO_100_CSV)
-        self.train_dataset, self.random7600_dataset, self.human7600_dataset = dataset.train_eval_split(num_eval_samples_per_len=100)
+
+        self.train_dataset = RibosomeLoadingDataset(self.data_root / TRAIN_PATH, alphabet=self.alphabet)
+        self.val_dataset = RibosomeLoadingDataset(self.data_root / VAL_PATH, alphabet=self.alphabet)
+        self.test_dataset = RibosomeLoadingDataset(self.data_root / TEST_PATH, alphabet=self.alphabet)
 
     def train_dataloader(self):
         return DataLoader(
@@ -54,7 +57,7 @@ class RibosomeLoadingDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-                self.random7600_dataset,
+                self.val_dataset,
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 pin_memory=self.pin_memory,
@@ -62,11 +65,14 @@ class RibosomeLoadingDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(
-                self.human7600_dataset,
+                self.test_dataset,
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 pin_memory=self.pin_memory,
         )
+
+
+'''
 def prepare_data(data_root):
 
     download_ribosome_loading_data(data_root)
@@ -77,3 +83,4 @@ if __name__ == "__main__":
     #print(root)
     data_root = Path('./ribosom_loading_data')
     prepare_data(data_root)
+'''

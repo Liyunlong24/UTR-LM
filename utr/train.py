@@ -41,7 +41,7 @@ class UTRMLMWrapper(pl.LightningModule):
             if "contact_head" in name:
                 param.requires_grad = False
 
-        self.loss = UTRLMLoss(config.loss)
+        self.loss = UTRLMLoss
         #找到了
         self.ema = ExponentialMovingAverage(
             model=self.model, decay=config.ema.decay #decay=0.999
@@ -52,30 +52,30 @@ class UTRMLMWrapper(pl.LightningModule):
     def forward(self, batch):
         return self.model(batch)
 
-    def _log(self, loss_breakdown, batch, outputs, train=True):
+    def _log(self, loss,train=True):
         phase = "train" if train else "val"
-        for loss_name, indiv_loss in loss_breakdown.items():
+        #for loss_name, indiv_loss in loss_breakdown.items():
+        self.log(
+            f"{phase}",
+            loss,
+            on_step=train, on_epoch=(not train), logger=True,
+            batch_size=self.config.data.batch_size,
+        )
+
+        if train:
             self.log(
-                f"{phase}/{loss_name}",
-                indiv_loss,
-                on_step=train, on_epoch=(not train), logger=True,
+                f"{phase}",
+                loss,
+                on_step=False, on_epoch=True, logger=True,
                 batch_size=self.config.data.batch_size,
             )
-
-            if (train):
-                self.log(
-                    f"{phase}/{loss_name}_epoch",
-                    indiv_loss,
-                    on_step=False, on_epoch=True, logger=True,
-                    batch_size=self.config.data.batch_size,
-                )
-
+        '''
         with torch.no_grad():
             other_metrics = self._compute_validation_metrics(
                 batch,
                 outputs,
             )
-
+        
         for k, v in other_metrics.items():
             self.log(
                 f"{phase}/{k}",
@@ -84,13 +84,20 @@ class UTRMLMWrapper(pl.LightningModule):
                 batch_size=self.config.data.batch_size,
             )
 
+        '''
     def training_step(self, batch, batch_idx):
         if (self.ema.device != batch["tokens"].device):
             self.ema.to(batch["tokens"].device)
 
         outputs = self.model(batch["tokens"])
-        loss, loss_breakdown = self.loss(outputs, batch, _return_breakdown=True)
-        self._log(loss_breakdown, batch, outputs, train=True)
+        loss = self.loss(outputs, batch)
+        #self._log(loss,train=True)
+        self.log(
+            "train",
+            loss,
+            on_step=True, on_epoch=True, logger=True,
+            batch_size=self.config.data.batch_size,
+        )
         # self.find_unused_parameters()
         #print('一轮训练结束')
         return loss
@@ -111,15 +118,21 @@ class UTRMLMWrapper(pl.LightningModule):
 
         outputs = self.model(batch["tokens"])
 
-        loss, loss_breakdown = self.loss(outputs, batch, _return_breakdown=True)
-        self._log(loss_breakdown, batch, outputs, train=False)
+        loss= self.loss(outputs, batch)
+        self.log(
+            "val",
+            loss,
+            on_step=True, on_epoch=True, logger=True,
+            batch_size=self.config.data.batch_size,
+        )
+        #self._log(loss, train=False)
 
     def on_validation_epoch_end(self):
         # Restore the model weights to normal
         if self.config.globals.use_ema:
             self.model.load_state_dict(self.cached_weights)
             self.cached_weights = None
-
+    '''
     def _compute_validation_metrics(self,batch,outputs, ):
         metrics = {}
 
@@ -131,7 +144,7 @@ class UTRMLMWrapper(pl.LightningModule):
 
             metrics["secstr_acc"] = secstr_acc
         return metrics
-
+    '''
     def find_unused_parameters(self) -> None:
         print("on_after_backward enter")
         for name, p in self.model.named_parameters():
@@ -219,7 +232,7 @@ class UTRMLMWrapper(pl.LightningModule):
                 "scheduler": lr_scheduler,
                 "interval": "epoch",
                 "frequency": 1,
-                "monitor": "val/loss",
+                "monitor": "val",
                 "name": "ReduceLROnPlateau",
             }
         elif scheduler_config.type == "none":
@@ -342,33 +355,26 @@ def main(args):
     callbacks = []
 
     #用到,保存模型的条件和保存时机
-    if (args.checkpoint_every_epoch):
-        if args.deepspeed_config_path is not None or not args.wandb:
-            dirpath = None
-        else:
-            dirpath = os.path.join(
-                args.output_dir,
-                args.wandb_project,
-                args.wandb_version,
-                "checkpoints",
-            )
-        mc = ModelCheckpoint(
-            filename="epoch{epoch:02d}-step{step}-loss={val/loss:.3f}",
-            dirpath=dirpath,
-            auto_insert_metric_name=False,
-            monitor="val/loss",
-            mode="min",
-            every_n_epochs=1,
-            save_last=False,
-            save_top_k=args.save_top_k,
-        )
-        callbacks.append(mc)
+
+    dirpath = os.path.join(args.output_dir,"checkpoints")
+
+    mc = ModelCheckpoint(
+        filename="epoch{epoch:02d}-step{step}-loss={val:.3f}",
+        dirpath=dirpath,
+        auto_insert_metric_name=False,
+        monitor="val",
+        mode="min",
+        every_n_epochs=1,
+        save_last=False,
+        save_top_k=args.save_top_k,
+    )
+    callbacks.append(mc)
     #没用到
     if (args.early_stopping):
         # get the first task name
         # task_name = config.globals.tasks[0]
         es = EarlyStoppingVerbose(
-            monitor=f"val/loss",
+            monitor=f"val",
             min_delta=args.min_delta,
             patience=args.patience,
             verbose=False,
@@ -404,15 +410,14 @@ def main(args):
          #   wdb_logger.experiment.save(args.deepspeed_config_path)
     #elif (args.gpus is not None and args.gpus > 1) or args.num_nodes > 1:
     strategy = DDPStrategy(find_unused_parameters=False)
-   # else:
-       # strategy = None
+
 
     # 记录训练过程中的一些参数
     if (args.wandb):
         freeze_path = f"{wdb_logger.experiment.dir}/package_versions.txt"
         os.system(f"{sys.executable} -m pip freeze > {freeze_path}")
         wdb_logger.experiment.save(f"{freeze_path}")
-        wdb_logger.experiment.save("utr_lm/config.py")
+        wdb_logger.experiment.save("utr/config.py")
         wdb_logger.experiment.save(args.yaml_config)
 
     trainer = pl.Trainer(

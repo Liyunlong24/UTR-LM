@@ -37,7 +37,7 @@ class TeelDataset(Dataset):
 
         self.df = pd.read_csv(mrl_csv)
         self.df.dropna(subset=['te_log'], inplace=True)  # Remove entries with missing ribosome loading value
-
+        self.df.dropna(subset=['rnaseq_log'], inplace=True)
         self.alphabet = alphabet
         self.task_type = task_type
         self.max_enc_seq_len = -1
@@ -59,7 +59,7 @@ class TeelDataset(Dataset):
             rl = torch.tensor(df_row['rnaseq_log'], dtype=torch.float32)
 
         return seq_encoded, rl
-    def train_eval_split(self, val_size: float = 0.2, test_size: float = 0.1):
+    def train_eval_split(self, val_size: float = 0.1, test_size: float = 0.1):
         assert 'te_log' in self.df.columns and 'rnaseq_log' in self.df.columns, "CSV文件缺少te_log列或者rnaseq_log列"
 
         self.df.drop_duplicates('utr', inplace=True, keep=False)

@@ -7,7 +7,7 @@ from typing import Union
 from pathlib import Path
 
 from utr.data.alphabet import Alphabet
-
+'''
 MIN_EVAL_SEQ_LEN = 25
 MAX_EVAL_SEQ_LEN = 100
 
@@ -20,6 +20,7 @@ def _generate_eval_set_eq_sampled_lens(df: pd.DataFrame, min_seq_len: int, max_s
         eval_idcs.update(len_df.iloc[:num_samples_per_len].index.values.tolist())
 
     return eval_idcs
+'''
 
 class RibosomeLoadingDataset(Dataset):
     def __init__(
@@ -51,7 +52,9 @@ class RibosomeLoadingDataset(Dataset):
         rl = torch.tensor(df_row['rl'], dtype=torch.float32)
 
         return seq_encoded, rl
-    
+
+
+    '''
     def train_eval_split(self, num_eval_samples_per_len: int = 100):
         assert 'set' in self.df.columns and 'total_reads' in self.df.columns, "Given CSV file cannot be split into training and validation sets!"
 
@@ -82,3 +85,4 @@ class RibosomeLoadingDataset(Dataset):
         train_ds = Subset(self, indices=list(train_idcs))
 
         return train_ds, random7600_ds, human7600_ds
+        '''

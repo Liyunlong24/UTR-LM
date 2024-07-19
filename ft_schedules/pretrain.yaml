@@ -1,11 +1,11 @@
 data:
   max_len: 1022
-  batch_size: 32
-  num_workers: 16
+  batch_size: 8
+  num_workers: 4
   train_epoch_len: 256000
   #需要修改新数据位置
-  train_path: /home/yunlongli/code/protexp-dev/Data/Pretrained_Data/Fivespecies_Cao_energy_structure_CaoEnergyNormalDist_255795sequence_train.fasta
-  valid_path: /home/yunlongli/code/protexp-dev/Data/Pretrained_Data/Fivespecies_Cao_energy_structure_CaoEnergyNormalDist_255795sequence_valid.fasta
+  train_path: /home/yunlongli/code/UTR-LM/data/Fivespecies_Sample_Cao_all_train.fasta
+  valid_path: /home/yunlongli/code/UTR-LM/data/Fivespecies_Sample_Cao_all_val.fasta
 
 loss:
   mlm_loss:
@@ -19,10 +19,8 @@ optimizer:
   lr: 1.0e-5
 
 scheduler:
-  type: plateau
-  lr_factor: 0.1
-  lr_patience: 10
-  lr_min: 1.0e-7
+  type: cosine
+  lr_cosine_length: 75000
 
 #model:
   #num_layers: 6

@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LinearLR
-
+import os
 import pytorch_lightning as pl
 
 from pytorch_lightning.loggers.wandb import WandbLogger
@@ -12,6 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.strategies import DDPStrategy
 
 from torchmetrics.regression import R2Score
+from torchmetrics import PearsonCorrCoef, SpearmanCorrCoef
 
 import argparse
 from pathlib import Path
@@ -31,7 +32,7 @@ class TeelPredictionWrapper(pl.LightningModule):
             lm_config: str = "nano",
             head_embed_dim: int = 32,
             head_num_blocks: int = 6,
-            lr: float = 1e-3,
+            lr: float = 1e-4,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -48,7 +49,8 @@ class TeelPredictionWrapper(pl.LightningModule):
 
         self.loss = nn.MSELoss()
         self.r2_metric = R2Score()
-
+        self.pearson = PearsonCorrCoef()
+        self.spearman = SpearmanCorrCoef()
         self.lr = lr
 
         self.pad_idx = self.lm.config['model']['embedding'].padding_idx
@@ -103,13 +105,17 @@ class TeelPredictionWrapper(pl.LightningModule):
         seq_encoded, rl_target = batch
         preds = self(seq_encoded)
 
+        self.r2_metric.update(preds, rl_target)
+        self.pearson.update(preds, rl_target)
+        self.spearman.update(preds, rl_target)
+
         scaled_rl_target = self.scaler.transform(rl_target)
         loss = self.loss(preds, scaled_rl_target)
 
         preds = self.scaler.inverse_transform(preds).clamp(min=0.0)  # "Unscale" predictions
         mse = F.mse_loss(preds, rl_target)
         mae = F.l1_loss(preds, rl_target)
-        self.r2_metric.update(preds, rl_target)
+
 
         log = {
             f'{log_prefix}/loss': loss,
@@ -126,13 +132,18 @@ class TeelPredictionWrapper(pl.LightningModule):
     def _on_eval_epoch_start(self):
         # Reset metric calculator
         self.r2_metric.reset()
+        self.pearson.reset()
+        self.spearman.reset()
 
     def _on_eval_epoch_end(self, log_prefix: str):
         # Log and reset metric calculator
         if not self.trainer.sanity_checking:
             self.log(f"{log_prefix}/r2", self.r2_metric.compute(), sync_dist=True)
+            self.log(f"{log_prefix}/pearson", self.pearson.compute(), sync_dist=True)
+            self.log(f"{log_prefix}/spearman", self.spearman.compute(), sync_dist=True)
             self.r2_metric.reset()
-
+            self.pearson.reset()
+            self.spearman.reset()
     def training_step(self, batch, batch_idx):
         if self.current_epoch == 0:
             self.fit_scaler(batch)
@@ -159,8 +170,8 @@ class TeelPredictionWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
-        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1,
-                             total_iters=5000)  # TODO: Currently hardcoded!
+        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.8,
+                             total_iters=150)  # TODO: Currently hardcoded!
 
         return {
             "optimizer": optimizer,
@@ -219,12 +230,19 @@ def main(args):
         )
         loggers.append(wandb_logger)
 
+
+    dirpath = os.path.join(args.output_dir, "checkpoints")
+
     if args.checkpoint_every_epoch:
         epoch_ckpt_callback = ModelCheckpoint(
-            dirpath=args.output_dir,
-            filename='teel-ss-epoch_ckpt-{epoch}-{step}',
+            dirpath=dirpath,
+            filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
             every_n_epochs=1,
-            save_top_k=-1
+            save_top_k=10,
+            auto_insert_metric_name = False,
+            monitor = "val/loss",
+            mode = "min",
+            save_last = False,
         )
         callbacks.append(epoch_ckpt_callback)
 

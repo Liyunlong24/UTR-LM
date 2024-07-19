@@ -43,6 +43,7 @@ def parse_fasta(fasta_string: str) -> Tuple[Sequence[str], Sequence[str]]:
             continue
         elif not line:
             continue  # Skip blank lines.
+        #保证sequences和descriptions长度一致
         sequences[index] += line
 
     return sequences, descriptions
