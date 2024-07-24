@@ -32,7 +32,7 @@ class RibosomeLoadingDataset(Dataset):
         super().__init__()
 
         self.df = pd.read_csv(mrl_csv)
-        self.df.dropna(subset=['rl'], inplace=True) # Remove entries with missing ribosome loading value
+        self.df.dropna(subset=['te_log'], inplace=True) # Remove entries with missing ribosome loading value
 
         self.alphabet = alphabet
 
@@ -49,7 +49,7 @@ class RibosomeLoadingDataset(Dataset):
         seq = df_row['utr']
         seq_encoded = torch.tensor(self.alphabet.encode(seq, pad_to_len=self.max_enc_seq_len), dtype=torch.long)
 
-        rl = torch.tensor(df_row['rl'], dtype=torch.float32)
+        rl = torch.tensor(df_row['te_log'], dtype=torch.float32)
 
         return seq_encoded, rl
 

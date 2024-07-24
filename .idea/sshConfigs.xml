@@ -3,6 +3,7 @@
   <component name="SshConfigs">
     <configs>
       <sshConfig authType="PASSWORD" host="117.161.174.146" id="b8e7b517-e82a-4a53-ba32-a2a70fda243d" port="32012" nameFormat="DESCRIPTIVE" username="yunlongli" useOpenSSHConfig="true" />
+      <sshConfig host="117.161.174.146" id="e6210098-9b3c-4edb-933d-14d03f021800" keyPath="C:\Users\61997\.ssh\id_rsa_yunlongli" port="32012" nameFormat="DESCRIPTIVE" username="yunlongli" useOpenSSHConfig="true" />
     </configs>
   </component>
 </project>

@@ -42,9 +42,9 @@ class RibosomeLoadingDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
 
-        self.train_dataset = RibosomeLoadingDataset(self.data_root / TRAIN_PATH, alphabet=self.alphabet)
-        self.val_dataset = RibosomeLoadingDataset(self.data_root / VAL_PATH, alphabet=self.alphabet)
-        self.test_dataset = RibosomeLoadingDataset(self.data_root / TEST_PATH, alphabet=self.alphabet)
+        self.train_dataset = RibosomeLoadingDataset(Path('./data/HEK_train_data.csv'), alphabet=self.alphabet)
+        self.val_dataset = RibosomeLoadingDataset(Path('./data/HEK_test_data.csv'), alphabet=self.alphabet)
+        self.test_dataset = RibosomeLoadingDataset(Path('./data/HEK_val_data.csv'), alphabet=self.alphabet)
 
     def train_dataloader(self):
         return DataLoader(

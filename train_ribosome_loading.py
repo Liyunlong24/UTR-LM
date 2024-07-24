@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import LinearLR
 
 import pytorch_lightning as pl
 
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.callbacks.lr_monitor import LearningRateMonitor
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -40,6 +41,12 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
 
         self.lm = RiNALMo(model_config(lm_config))
 
+        '''
+        #冻结预训练
+        for param in self.lm.parameters():
+            param.requires_grad = False
+        '''
+
         self.pred_head = RibosomeLoadingPredictionHead(
             c_in=self.lm.config['model']['transformer'].embed_dim,
             embed_dim=head_embed_dim,
@@ -55,10 +62,8 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
 
         self.pad_idx = self.lm.config['model']['embedding'].padding_idx
 
+
     def load_pretrained_lm_weights(self, pretrained_weights_path):
-
-        #self.lm.load_state_dict(torch.load(pretrained_weights_path))
-
 
         checkpoint = torch.load(pretrained_weights_path, map_location='cpu')
 
@@ -80,11 +85,6 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         self.lm.load_state_dict(adapted_state_dict,strict=True, assign=False)
         print('加载模型成功')
 
-        #self.lm.load_state_dict(torch.load(pretrained_weights_path))
-
-
-        self.lm.load_state_dict(adapted_state_dict,strict=True, assign=False)
-        print('加载模型成功')
 
 
     def forward(self, tokens):
@@ -110,7 +110,7 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         scaled_rl_target = self.scaler.transform(rl_target)
         loss = self.loss(preds, scaled_rl_target)
 
-        preds = self.scaler.inverse_transform(preds).clamp(min=0.0) # "Unscale" predictions
+        preds = self.scaler.inverse_transform(preds) # "Unscale" predictions
         mse = F.mse_loss(preds, rl_target)
         mae = F.l1_loss(preds, rl_target)
         self.r2_metric.update(preds, rl_target)
@@ -152,6 +152,7 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         return self._common_step(batch, batch_idx, log_prefix="train")
 
     def validation_step(self, batch, batch_idx):
+
         return self._eval_step(batch, batch_idx, log_prefix="val")
     
     def on_validation_epoch_start(self):
@@ -171,15 +172,23 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
-        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=5000) # TODO: Currently hardcoded!
-
+        #scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.09, total_iters=900) # TODO: Currently hardcoded!
+        scheduler = ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.85,
+            patience=3,
+            min_lr=5e-6,
+        )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "interval": "step",
+                "interval": "epoch",
+                "monitor": "val/loss",
             }
         }
+        #return optimizer
 
 def main(args):
     if args.seed:

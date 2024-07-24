@@ -32,18 +32,16 @@ class TeelDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-        self.skip_data_preparation = skip_data_preparation
-        self._data_prepared = skip_data_preparation
-
-    def prepare_data(self):
-        if not self.skip_data_preparation and not self._data_prepared:
-            download_ribosome_loading_data(self.data_root)
-            self._data_prepared = True
 
     def setup(self, stage: Optional[str] = None):
-        dataset = TeelDataset(self.data_root, alphabet=self.alphabet, task_type=self.task_type)
 
-        self.train_dataset, self.val_dataset, self.test_dataset = dataset.train_eval_split()
+        # self.train_dataset = TeelDataset(Path('./data/HEK_train_data.csv') , alphabet=self.alphabet)
+        # self.val_dataset = TeelDataset(Path('./data/HEK_test_data.csv'), alphabet=self.alphabet)
+        # self.test_dataset = TeelDataset(Path('./data/HEK_val_data.csv'), alphabet=self.alphabet)
+
+        self.train_dataset = TeelDataset(Path('./data/4.1_train.csv') , alphabet=self.alphabet)
+        self.val_dataset = TeelDataset(Path('./data/4.1_val_test.csv'), alphabet=self.alphabet)
+        self.test_dataset = TeelDataset(Path('./data/4.1_val_test.csv'), alphabet=self.alphabet)
 
     def train_dataloader(self):
         return DataLoader(

@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import LinearLR
 import os
 import pytorch_lightning as pl
 
+from torch.optim.lr_scheduler import ReduceLROnPlateau,SequentialLR, ConstantLR
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.callbacks.lr_monitor import LearningRateMonitor
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -41,6 +42,9 @@ class TeelPredictionWrapper(pl.LightningModule):
 
         self.lm = RiNALMo(model_config(lm_config))
 
+        #for param in self.lm.parameters():
+          #  param.requires_grad = False
+
         self.pred_head = RibosomeLoadingPredictionHead(
             c_in=self.lm.config['model']['transformer'].embed_dim,
             embed_dim=head_embed_dim,
@@ -56,8 +60,6 @@ class TeelPredictionWrapper(pl.LightningModule):
         self.pad_idx = self.lm.config['model']['embedding'].padding_idx
 
     def load_pretrained_lm_weights(self, pretrained_weights_path):
-
-        # self.lm.load_state_dict(torch.load(pretrained_weights_path))
 
         checkpoint = torch.load(pretrained_weights_path, map_location='cpu')
 
@@ -79,10 +81,6 @@ class TeelPredictionWrapper(pl.LightningModule):
         self.lm.load_state_dict(adapted_state_dict, strict=True, assign=False)
         print('加载模型成功')
 
-        # self.lm.load_state_dict(torch.load(pretrained_weights_path))
-
-        self.lm.load_state_dict(adapted_state_dict, strict=True, assign=False)
-        print('加载模型成功')
 
     def forward(self, tokens):
         x = self.lm(tokens)["representation"]
@@ -97,25 +95,25 @@ class TeelPredictionWrapper(pl.LightningModule):
     def fit_scaler(self, batch):
         _, rl = batch
         self.scaler.partial_fit(rl)
-        # 以下为新加的
-        loss = torch.tensor(0.0)
-        return loss
 
     def _common_step(self, batch, batch_idx, log_prefix: str):
         seq_encoded, rl_target = batch
         preds = self(seq_encoded)
-
-        self.r2_metric.update(preds, rl_target)
-        self.pearson.update(preds, rl_target)
-        self.spearman.update(preds, rl_target)
-
         scaled_rl_target = self.scaler.transform(rl_target)
+
+        #print(f'模型预测：{preds},label：{rl_target},归一化后label:{scaled_rl_target}')
+
         loss = self.loss(preds, scaled_rl_target)
 
-        preds = self.scaler.inverse_transform(preds).clamp(min=0.0)  # "Unscale" predictions
+        preds = self.scaler.inverse_transform(preds)
+
         mse = F.mse_loss(preds, rl_target)
         mae = F.l1_loss(preds, rl_target)
 
+        self.r2_metric.update(preds, rl_target)
+
+        self.pearson.update(preds, rl_target)
+        self.spearman.update(preds, rl_target)
 
         log = {
             f'{log_prefix}/loss': loss,
@@ -170,8 +168,7 @@ class TeelPredictionWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
-        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.8,
-                             total_iters=150)  # TODO: Currently hardcoded!
+        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=5000) # TODO: Currently hardcoded!
 
         return {
             "optimizer": optimizer,
@@ -180,8 +177,36 @@ class TeelPredictionWrapper(pl.LightningModule):
                 "interval": "step",
             }
         }
+        '''
+        optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
+        #scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1,
+                        #     total_iters=300)  # TODO: Currently hardcoded!
 
+        # scheduler = ReduceLROnPlateau(
+        #     optimizer,
+        #     mode="min",
+        #     factor=0.98,
+        #     patience=5,
+        #     min_lr=1e-5,
+        # )
+        # exponential_lr_scheduler = ExponentialLR(optimizer, gamma=0.9)  # 之后逐步减小学习率
+        initial_lr_scheduler = ConstantLR(optimizer, factor=1.0, total_iters=50*46)  #
 
+        exponential_lr_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.01,total_iters=150*46)
+        scheduler = SequentialLR(optimizer, schedulers=[initial_lr_scheduler, exponential_lr_scheduler],
+                                 milestones=[40])
+
+        # return {
+        #     "optimizer": optimizer,
+        #     "lr_scheduler": {
+        #         "scheduler": scheduler,
+        #         "interval": "step",
+        #         "monitor": "train/loss",
+        #     }
+        # }
+
+        return optimizer
+        '''
 def main(args):
     if args.seed:
         pl.seed_everything(args.seed)
@@ -207,12 +232,12 @@ def main(args):
     alphabet = Alphabet()
     datamodule = TeelDataModule(
         data_root=args.data_dir,
-        task_type=args.task_type,
+        #task_type=args.task_type,
         alphabet=alphabet,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_memory,
-        skip_data_preparation=not args.prepare_data,
+
     )
 
     # Set up callbacks and loggers
@@ -221,7 +246,6 @@ def main(args):
 
     if args.wandb:
         wandb_logger = WandbLogger(
-            name=args.wandb_experiment_name,
             save_dir=args.output_dir,
             version=args.wandb_version,
             project=args.wandb_project,
@@ -238,7 +262,7 @@ def main(args):
             dirpath=dirpath,
             filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
             every_n_epochs=1,
-            save_top_k=10,
+            save_top_k=5,
             auto_insert_metric_name = False,
             monitor = "val/loss",
             mode = "min",
@@ -357,10 +381,6 @@ if __name__ == "__main__":
 
     # Data
     parser.add_argument(
-        "--prepare_data", action="store_true", default=False,
-        help="Whether to download training and evaluation data"
-    )
-    parser.add_argument(
         "--batch_size", type=int, default=1,
         help="How many samples per batch to load"
     )
@@ -379,7 +399,7 @@ if __name__ == "__main__":
         help="Path to the fine-tuning schedule file"
     )
     parser.add_argument(
-        "--lr", type=float, default=1e-4,
+        "--lr", type=float, default=1e-3,
         help="Learning rate"
     )
     parser.add_argument(
@@ -408,7 +428,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--task_type", type=str, required=True,
-        help="Double precision, full precision, 16bit mixed precision or bfloat16 mixed precision"#需要修改
+        help="You must specify whether it is a TE or EL task, which will process different data in the same file."#需要修改
     )
 
     args = parser.parse_args()
