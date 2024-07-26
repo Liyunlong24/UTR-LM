@@ -46,5 +46,8 @@ Please refer to the document for data set conditions, detailed training and fine
 1、A 5′ UTR language model for decoding 
 untranslated regions of mRNA and 
 function predictions\
+(https://doi.org/10.1038/s42256-024-00823-9)
+
 2、RiNALMo: General-Purpose RNA Language Models Can Generalize Well on
-Structure Prediction Tasks
+Structure Prediction Tasks\
+(https://arxiv.org/abs/2403.00043)
