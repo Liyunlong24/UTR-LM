@@ -221,7 +221,6 @@ def main(args):
 
     if args.wandb:
         wandb_logger = WandbLogger(
-            name=args.wandb_experiment_name,
             save_dir=args.output_dir,
             version=args.wandb_version,
             project=args.wandb_project,
@@ -332,16 +331,8 @@ if __name__ == "__main__":
         help="Whether to log metrics to Weights & Biases"
     )
     parser.add_argument(
-        "--wandb_experiment_name", type=str, default=None,
-        help="Name of the current experiment. Used for wandb logging"
-    )
-    parser.add_argument(
         "--wandb_project", type=str, default=None,
         help="Name of the wandb project to which this run will belong"
-    )
-    parser.add_argument(
-        "--wandb_entity", type=str, default=None,
-        help="Wandb username or team name to which runs are attributed"
     )
     parser.add_argument(
         "--wandb_version", type=str, default=None,

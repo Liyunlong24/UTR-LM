@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES="2,3" python3 \
     --experiment_name pretrain_cosine_300 \
     --seed 2024 \
     --checkpoint_every_epoch \
-    --save_top_k 20 \
+    --save_top_k 10 \
     --use_ema true \
     >> ./output/pretrain_300/logs/train_exp2.log 2>&1
     #--replace_sampler_ddp=True \

@@ -42,7 +42,7 @@ class UTRMLMWrapper(pl.LightningModule):
                 param.requires_grad = False
 
         self.loss = UTRLMLoss
-        #找到了
+
         self.ema = ExponentialMovingAverage(
             model=self.model, decay=config.ema.decay #decay=0.999
         )
@@ -69,22 +69,7 @@ class UTRMLMWrapper(pl.LightningModule):
                 on_step=False, on_epoch=True, logger=True,
                 batch_size=self.config.data.batch_size,
             )
-        '''
-        with torch.no_grad():
-            other_metrics = self._compute_validation_metrics(
-                batch,
-                outputs,
-            )
-        
-        for k, v in other_metrics.items():
-            self.log(
-                f"{phase}/{k}",
-                torch.mean(v),
-                on_step=False, on_epoch=True, logger=True,
-                batch_size=self.config.data.batch_size,
-            )
 
-        '''
     def training_step(self, batch, batch_idx):
         if (self.ema.device != batch["tokens"].device):
             self.ema.to(batch["tokens"].device)
@@ -98,8 +83,6 @@ class UTRMLMWrapper(pl.LightningModule):
             on_step=True, on_epoch=True, logger=True,
             batch_size=self.config.data.batch_size,
         )
-        # self.find_unused_parameters()
-        #print('一轮训练结束')
         return loss
 
     def on_before_zero_grad(self, *args, **kwargs):
@@ -132,19 +115,7 @@ class UTRMLMWrapper(pl.LightningModule):
         if self.config.globals.use_ema:
             self.model.load_state_dict(self.cached_weights)
             self.cached_weights = None
-    '''
-    def _compute_validation_metrics(self,batch,outputs, ):
-        metrics = {}
 
-        # secstr acc
-        if "label_secstr" in batch and "logits_ss" in outputs:
-            secstr_acc = (outputs["logits_ss"].argmax(-1) == batch["label_secstr"]).float()
-            secstr_mask = batch["label_secstr"] != -1  # (B, N)
-            secstr_acc = (secstr_acc * secstr_mask).sum(-1) / (secstr_mask.sum(-1) + 1e-5)
-
-            metrics["secstr_acc"] = secstr_acc
-        return metrics
-    '''
     def find_unused_parameters(self) -> None:
         print("on_after_backward enter")
         for name, p in self.model.named_parameters():
@@ -294,41 +265,33 @@ class UTRMLMWrapper(pl.LightningModule):
 
 def main(args):
 
-    #命令行参数1，seed
     if (args.seed is not None):
         seed_everything(args.seed)
 
-    #命令行参数2，yaml_config
+
     config = UTRLMConfig(
         name="pretraining",
         yaml_config=args.yaml_config
     )
-    #命令行参数3，use_ema
+
     config.globals.use_ema = args.use_ema
 
-    # data module
-    #tokenizer = Alphabet.from_architecture("dna_lm")
+
     tokenizer = Alphabet()
 
-    # PretrainedDataModule需要参数 tokenizer、max_len、batch_size、num_workers、train_path、
-    # valid_path、test_path、 batch_seed、train_epoch_len
-
-    #用到的是
     data_module = PretrainedDataModule(
         tokenizer=tokenizer,
         batch_seed=args.seed,
         **config.data,
     )
-    # datamodule操作1，但是本项目中也不需要下载数据之类的操作，并不体现作用
-    #data_module.prepare_data()
+
     data_module.setup()
 
-    # 需要参数config.loss、config.ema.decay
+
     model_module = UTRMLMWrapper(config, tokenizer)
 
-    # 处理模型从checkpoint恢复训练的情况，包括恢复学习率步数和模型权重
     if (args.resume_from_ckpt):
-        if (os.path.isdir(args.resume_from_ckpt)):  # 如果是个目录就调用函数从目录中获取最后的全局步数
+        if (os.path.isdir(args.resume_from_ckpt)):
             last_global_step = get_global_step_from_zero_checkpoint(args.resume_from_ckpt)
         else:
             sd = torch.load(args.resume_from_ckpt, map_location="cpu")
@@ -354,8 +317,6 @@ def main(args):
 
     callbacks = []
 
-    #用到,保存模型的条件和保存时机
-
     dirpath = os.path.join(args.output_dir,"checkpoints")
 
     mc = ModelCheckpoint(
@@ -369,7 +330,7 @@ def main(args):
         save_top_k=args.save_top_k,
     )
     callbacks.append(mc)
-    #没用到
+
     if (args.early_stopping):
         # get the first task name
         # task_name = config.globals.tasks[0]
@@ -383,36 +344,24 @@ def main(args):
             strict=True,
         )
         callbacks.append(es)
-    #用到了
+
     if (args.log_lr):
         lr_monitor = LearningRateMonitor(logging_interval="step")
         callbacks.append(lr_monitor)
 
     loggers = []
-    # 设置wandb
+
     if (args.wandb):
         wdb_logger = WandbLogger(
-            name=args.experiment_name,
             save_dir=args.output_dir,
             version=args.wandb_version,
             project=args.wandb_project,
-            #id=args.wandb_id,
             offline=True,
         )
         loggers.append(wdb_logger)
 
-    # 分布式训练用的是ddp
-   # if (args.deepspeed_config_path is not None):
-       # strategy = DeepSpeedStrategy(
-     #       config=args.deepspeed_config_path,
-      #  )
-       # if (args.wandb):
-         #   wdb_logger.experiment.save(args.deepspeed_config_path)
-    #elif (args.gpus is not None and args.gpus > 1) or args.num_nodes > 1:
     strategy = DDPStrategy(find_unused_parameters=False)
 
-
-    # 记录训练过程中的一些参数
     if (args.wandb):
         freeze_path = f"{wdb_logger.experiment.dir}/package_versions.txt"
         os.system(f"{sys.executable} -m pip freeze > {freeze_path}")
@@ -433,18 +382,10 @@ def main(args):
         log_every_n_steps=6,
         precision=args.precision,
     )
-
-    if (args.resume_model_weights_only):
-        ckpt_path = None
-    else:
-        ckpt_path = args.resume_from_ckpt
-
     trainer.fit(
         model_module,
         datamodule=data_module,
-        #ckpt_path=ckpt_path,
     )
-
 def bool_type(bool_str: str):
     bool_str_lower = bool_str.lower()
     if bool_str_lower in ('false', 'f', 'no', 'n', '0'):
@@ -455,7 +396,6 @@ def bool_type(bool_str: str):
         raise ValueError(f'Cannot interpret {bool_str} as bool')
 
 if __name__ == '__main__':
-    print('开始运行')
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--lm_config", type=str, default="nano",
