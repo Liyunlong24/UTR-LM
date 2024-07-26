@@ -40,13 +40,11 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         self.scaler = StandardScaler()
 
         self.lm = RiNALMo(model_config(lm_config))
-
         '''
-        #冻结预训练
+        #Freeze pretrained model parameters
         for param in self.lm.parameters():
             param.requires_grad = False
         '''
-
         self.pred_head = RibosomeLoadingPredictionHead(
             c_in=self.lm.config['model']['transformer'].embed_dim,
             embed_dim=head_embed_dim,
@@ -72,20 +70,17 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         else:
             state_dict = checkpoint
 
-        # 进行键名的调整，将预训练权重中的键名适配到当前模型中
         adapted_state_dict = {}
         for k, v in state_dict.items():
             if k.startswith('model.'):
-                adapted_state_dict[k[6:]] = v  # 去掉 'model.' 前缀
+                adapted_state_dict[k[6:]] = v
             else:
-                adapted_state_dict[f'model.{k}'] = v  # 添加 'model.' 前缀
+                adapted_state_dict[f'model.{k}'] = v
 
         if "threshold" in adapted_state_dict:
             adapted_state_dict.pop("threshold")
         self.lm.load_state_dict(adapted_state_dict,strict=True, assign=False)
-        print('加载模型成功')
-
-
+        print('Loading model successfully')
 
     def forward(self, tokens):
         x = self.lm(tokens)["representation"]
@@ -100,9 +95,7 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
     def fit_scaler(self, batch):
         _, rl = batch
         self.scaler.partial_fit(rl)
-        #以下为新加的
-        loss = torch.tensor(0.0)
-        return loss
+
     def _common_step(self, batch, batch_idx, log_prefix: str):
         seq_encoded, rl_target = batch
         preds = self(seq_encoded)
@@ -176,8 +169,8 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         scheduler = ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.85,
-            patience=3,
+            factor=0.9,
+            patience=5,
             min_lr=5e-6,
         )
         return {
@@ -242,7 +235,6 @@ def main(args):
         epoch_ckpt_callback = ModelCheckpoint(
             dirpath=dirpath,
             filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
-            #filename="epoch{epoch:02d}-step{step}-loss={val/loss:.3f}",
             auto_insert_metric_name=False,
             every_n_epochs=1,
             save_top_k=10,
@@ -257,10 +249,6 @@ def main(args):
         callbacks.append(lr_monitor)
 
     # Training
-    strategy='auto'
-    if args.devices != 'auto' and ("," in args.devices or (int(args.devices) > 1 and int(args.devices) != -1)):
-        strategy = DDPStrategy(find_unused_parameters=True)
-
     if args.ft_schedule:
         ft_callback = GradualUnfreezing(
             unfreeze_schedule_path=args.ft_schedule,

@@ -3,10 +3,10 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LinearLR
-import os
+
 import pytorch_lightning as pl
 
-from torch.optim.lr_scheduler import ReduceLROnPlateau,SequentialLR, ConstantLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.callbacks.lr_monitor import LearningRateMonitor
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -27,24 +27,23 @@ from utr.utils.scaler import StandardScaler
 from utr.utils.finetune_callback import GradualUnfreezing
 
 
-class TeelPredictionWrapper(pl.LightningModule):
+class RibosomeLoadingPredictionWrapper(pl.LightningModule):
     def __init__(
             self,
             lm_config: str = "nano",
             head_embed_dim: int = 32,
             head_num_blocks: int = 6,
-            lr: float = 1e-4,
+            lr: float = 1e-3,
     ):
         super().__init__()
         self.save_hyperparameters()
-
         self.scaler = StandardScaler()
-
         self.lm = RiNALMo(model_config(lm_config))
-
-        #for param in self.lm.parameters():
-          #  param.requires_grad = False
-
+        '''
+        #Freeze pretrained model parameters
+        for param in self.lm.parameters():
+            param.requires_grad = False
+        '''
         self.pred_head = RibosomeLoadingPredictionHead(
             c_in=self.lm.config['model']['transformer'].embed_dim,
             embed_dim=head_embed_dim,
@@ -55,6 +54,7 @@ class TeelPredictionWrapper(pl.LightningModule):
         self.r2_metric = R2Score()
         self.pearson = PearsonCorrCoef()
         self.spearman = SpearmanCorrCoef()
+
         self.lr = lr
 
         self.pad_idx = self.lm.config['model']['embedding'].padding_idx
@@ -68,19 +68,17 @@ class TeelPredictionWrapper(pl.LightningModule):
         else:
             state_dict = checkpoint
 
-        # 进行键名的调整，将预训练权重中的键名适配到当前模型中
         adapted_state_dict = {}
         for k, v in state_dict.items():
             if k.startswith('model.'):
-                adapted_state_dict[k[6:]] = v  # 去掉 'model.' 前缀
+                adapted_state_dict[k[6:]] = v
             else:
-                adapted_state_dict[f'model.{k}'] = v  # 添加 'model.' 前缀
+                adapted_state_dict[f'model.{k}'] = v
 
         if "threshold" in adapted_state_dict:
             adapted_state_dict.pop("threshold")
         self.lm.load_state_dict(adapted_state_dict, strict=True, assign=False)
-        print('加载模型成功')
-
+        print('Loading model successfully')
 
     def forward(self, tokens):
         x = self.lm(tokens)["representation"]
@@ -99,17 +97,13 @@ class TeelPredictionWrapper(pl.LightningModule):
     def _common_step(self, batch, batch_idx, log_prefix: str):
         seq_encoded, rl_target = batch
         preds = self(seq_encoded)
+
         scaled_rl_target = self.scaler.transform(rl_target)
-
-        #print(f'模型预测：{preds},label：{rl_target},归一化后label:{scaled_rl_target}')
-
         loss = self.loss(preds, scaled_rl_target)
 
-        preds = self.scaler.inverse_transform(preds)
-
+        preds = self.scaler.inverse_transform(preds)  # "Unscale" predictions
         mse = F.mse_loss(preds, rl_target)
         mae = F.l1_loss(preds, rl_target)
-
         self.r2_metric.update(preds, rl_target)
 
         self.pearson.update(preds, rl_target)
@@ -142,6 +136,7 @@ class TeelPredictionWrapper(pl.LightningModule):
             self.r2_metric.reset()
             self.pearson.reset()
             self.spearman.reset()
+
     def training_step(self, batch, batch_idx):
         if self.current_epoch == 0:
             self.fit_scaler(batch)
@@ -149,6 +144,7 @@ class TeelPredictionWrapper(pl.LightningModule):
         return self._common_step(batch, batch_idx, log_prefix="train")
 
     def validation_step(self, batch, batch_idx):
+
         return self._eval_step(batch, batch_idx, log_prefix="val")
 
     def on_validation_epoch_start(self):
@@ -168,45 +164,25 @@ class TeelPredictionWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
-        scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=5000) # TODO: Currently hardcoded!
+        # scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.09, total_iters=900) # TODO: Currently hardcoded!
+        scheduler = ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.9,
+            patience=5,
+            min_lr=5e-6,
+        )
 
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "interval": "step",
+                "interval": "epoch",
+                "monitor": "val/loss",
             }
         }
-        '''
-        optimizer = Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
-        #scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.1,
-                        #     total_iters=300)  # TODO: Currently hardcoded!
+        # return optimizer
 
-        # scheduler = ReduceLROnPlateau(
-        #     optimizer,
-        #     mode="min",
-        #     factor=0.98,
-        #     patience=5,
-        #     min_lr=1e-5,
-        # )
-        # exponential_lr_scheduler = ExponentialLR(optimizer, gamma=0.9)  # 之后逐步减小学习率
-        initial_lr_scheduler = ConstantLR(optimizer, factor=1.0, total_iters=50*46)  #
-
-        exponential_lr_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.01,total_iters=150*46)
-        scheduler = SequentialLR(optimizer, schedulers=[initial_lr_scheduler, exponential_lr_scheduler],
-                                 milestones=[40])
-
-        # return {
-        #     "optimizer": optimizer,
-        #     "lr_scheduler": {
-        #         "scheduler": scheduler,
-        #         "interval": "step",
-        #         "monitor": "train/loss",
-        #     }
-        # }
-
-        return optimizer
-        '''
 def main(args):
     if args.seed:
         pl.seed_everything(args.seed)
@@ -215,7 +191,7 @@ def main(args):
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     # Model
-    model = TeelPredictionWrapper(
+    model = RibosomeLoadingPredictionWrapper(
         lm_config=args.lm_config,
         head_embed_dim=args.embed_dim,
         head_num_blocks=args.num_blocks,
@@ -232,12 +208,11 @@ def main(args):
     alphabet = Alphabet()
     datamodule = TeelDataModule(
         data_root=args.data_dir,
-        #task_type=args.task_type,
         alphabet=alphabet,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_memory,
-
+        task_type=args.task_type,
     )
 
     # Set up callbacks and loggers
@@ -246,6 +221,7 @@ def main(args):
 
     if args.wandb:
         wandb_logger = WandbLogger(
+            name=args.wandb_experiment_name,
             save_dir=args.output_dir,
             version=args.wandb_version,
             project=args.wandb_project,
@@ -254,19 +230,17 @@ def main(args):
         )
         loggers.append(wandb_logger)
 
-
-    dirpath = os.path.join(args.output_dir, "checkpoints")
-
+    dirpath = args.output_dir + 'checkpoints'
     if args.checkpoint_every_epoch:
         epoch_ckpt_callback = ModelCheckpoint(
             dirpath=dirpath,
             filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
+            auto_insert_metric_name=False,
             every_n_epochs=1,
-            save_top_k=5,
-            auto_insert_metric_name = False,
-            monitor = "val/loss",
-            mode = "min",
-            save_last = False,
+            save_top_k=10,
+            monitor="val/loss",
+            mode="min",
+            save_last=False,
         )
         callbacks.append(epoch_ckpt_callback)
 
@@ -303,6 +277,11 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--task_type", type=str, required=True,
+        help="Directory with all the training and evaluation data"
+    )
 
     parser.add_argument(
         "--data_dir", type=str, default=None,
@@ -381,6 +360,10 @@ if __name__ == "__main__":
 
     # Data
     parser.add_argument(
+        "--prepare_data", action="store_true", default=False,
+        help="Whether to download training and evaluation data"
+    )
+    parser.add_argument(
         "--batch_size", type=int, default=1,
         help="How many samples per batch to load"
     )
@@ -399,7 +382,7 @@ if __name__ == "__main__":
         help="Path to the fine-tuning schedule file"
     )
     parser.add_argument(
-        "--lr", type=float, default=1e-3,
+        "--lr", type=float, default=1e-4,
         help="Learning rate"
     )
     parser.add_argument(
@@ -425,10 +408,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--precision", type=str, default='16-mixed',
         help="Double precision, full precision, 16bit mixed precision or bfloat16 mixed precision"
-    )
-    parser.add_argument(
-        "--task_type", type=str, required=True,
-        help="You must specify whether it is a TE or EL task, which will process different data in the same file."#需要修改
     )
 
     args = parser.parse_args()
