@@ -24,7 +24,7 @@ bash bash/teel_fine_tuning.sh
 Which Parameters you MUST to define:
 * task_type: Choose from "TE" or "EL"
 
-if you want to train TE and EL tasks on three data sets at the same time, please execute：
+If you want to train TE and EL tasks on three data sets at the same time, please execute：
 ```bash
 bash bash/teel_all_fine_tuning.sh
 ```
