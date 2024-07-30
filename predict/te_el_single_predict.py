@@ -1,5 +1,16 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/7/15 16:09
+import os
+import sys
+# 获取当前文件所在目录的绝对路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录
+project_root = os.path.join(current_dir, '..')
+# 将项目根目录添加到 PYTHONPATH 环境变量
+os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
+# 将项目根目录添加到 sys.path
+sys.path.append(project_root)
+
 import torch
 import torch.nn as nn
 from utr.model.model import RiNALMo

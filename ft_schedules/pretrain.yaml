@@ -1,7 +1,7 @@
 data:
   max_len: 1022
-  batch_size: 64
-  num_workers: 4
+  batch_size: 512
+  num_workers: 8
   train_epoch_len: 256000
   #需要修改新数据位置
   train_path: /home/yunlongli/code/UTR-LM/data/Fivespecies_Sample_Cao_all_train.fasta
@@ -19,8 +19,11 @@ optimizer:
   lr: 1.0e-5
 
 scheduler:
-  type: cosine
-  lr_cosine_length: 75000
+  type: plateau
+  lr_factor: 0.95
+  lr_patience: 3
+  lr_min: 1.0e-7
+
 
 #model:
   #num_layers: 6

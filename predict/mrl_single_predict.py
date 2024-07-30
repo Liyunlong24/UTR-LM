@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/7/10 10:06
+import os
+import sys
+# 获取当前文件所在目录的绝对路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录
+project_root = os.path.join(current_dir, '..')
+# 将项目根目录添加到 PYTHONPATH 环境变量
+os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
+# 将项目根目录添加到 sys.path
+sys.path.append(project_root)
 import torch
 import torch.nn as nn
 from utr.model.model import RiNALMo
@@ -8,10 +18,9 @@ from utr.config import model_config
 from utr.data.alphabet import Alphabet
 from utr.model.downstream import RibosomeLoadingPredictionHead
 from utr.utils.scaler import StandardScaler
-from torchmetrics.regression import R2Score
-
 lm_config='nano'
-ssmodel_weights_path = './output/ribosome_loading/mrl-epoch_ckpt-epoch=4-step=1495.ckpt'
+#ssmodel_weights_path = './output/ribosome_loading/mrl-epoch_ckpt-epoch=4-step=1495.ckpt'
+ssmodel_weights_path = './output/mrl/checkpoints/epoch29-step3810-loss=0.074.ckpt'
 
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
@@ -37,7 +46,6 @@ class RibosomeLoadingPredictionModel(nn.Module):
         )
 
         self.loss = nn.MSELoss()
-        self.r2_metric = R2Score()
 
         self.lr = lr
 

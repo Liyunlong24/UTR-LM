@@ -1,13 +1,24 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2024/7/10 10:06
+# @Time    : 2024/7/30 17:31
+import os
+import sys
+# 获取当前文件所在目录的绝对路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录
+project_root = os.path.join(current_dir, '..')
+# 将项目根目录添加到 PYTHONPATH 环境变量
+os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
+# 将项目根目录添加到 sys.path
+sys.path.append(project_root)
 import torch
 import torch.nn as nn
 from utr.model.model import RiNALMo
 from utr.model.downstream import SecStructPredictionHead
 from utr.config import model_config
 from utr.data.alphabet import Alphabet
-from utr.utils.sec_struct import prob_mat_to_sec_struct, ss_precision, ss_recall, ss_f1, save_to_ct
+from utr.utils.sec_struct import prob_mat_to_sec_struct, save_to_ct
 from pathlib import Path
+from Bio import SeqIO
 
 lm_config='nano'
 ssmodel_weights_path = './output/archiveII/5s/ss/v2/checkpoints/epoch=2-step=3486.ckpt'
@@ -33,12 +44,33 @@ class SecStructPredictionModel(nn.Module):
         logits = self.pred_head(x[..., 1:-1, :]).squeeze(-1)
         return logits
 
+def load_fasta(fasta_file):
+    sequences = []
+    max_enc_seq_len = 0
+
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        seq_str = str(record.seq)
+        sequences.append(seq_str)
+
+        # 更新最大长度
+        max_enc_seq_len = max(max_enc_seq_len, len(seq_str))
+
+    return sequences, max_enc_seq_len
+
+
+fasta_file = './data/test.fasta'  # 修改为你的fasta文件路径
+#output_csv = 'predictions.csv'  # 修改为你希望保存的CSV文件路径
+batch_size = 32  # 设定batch size
+
 if __name__ == '__main__':
 
-    #分词器
+    predictions = []
+
+    sequences, max_enc_seq_len = load_fasta(fasta_file)
+    print(max_enc_seq_len)
+
     tokenizer = Alphabet()
 
-    #加载模型
     model = SecStructPredictionModel(lm_config="nano", num_resnet_blocks=2, lr=1e-5)
     checkpoint = torch.load(ssmodel_weights_path, map_location='cpu')
 
@@ -64,17 +96,16 @@ if __name__ == '__main__':
     model.eval()
     print('加载模型成功')
 
-    while True:
+    for i in range(0, len(sequences), batch_size):
+        batch_seqs = sequences[i:i + batch_size]
+        inputs = [tokenizer.encode(seq, pad_to_len=max_enc_seq_len + 2) for seq in batch_seqs]
 
-        seqs = input('请输入 RNA 序列：')   #AUGGCUACGUUAGCUGAACCGUAG
-        output_file = 'output/predict_file/ss_predict.ct'
-        #seqs = 'AUGG'
-        inputs = torch.tensor(tokenizer.encode(seqs), dtype=torch.int64).unsqueeze(0).to(device)
+        # Convert the list of lists to a 2D tensor
+        inputs_tensor = torch.tensor(inputs, dtype=torch.int64).to(device)
 
         with torch.no_grad():
             with torch.cuda.amp.autocast():
-                logits = model(inputs)
-                #print(logits)
+                logits = model(inputs_tensor)
                 probs = torch.sigmoid(logits)
 
         if probs.dtype == torch.bfloat16:
@@ -82,15 +113,13 @@ if __name__ == '__main__':
             probs = probs.type(torch.float16)
 
         probs = probs.cpu().numpy()
-        #print(probs)
-        probs = probs[0]
-        #print(probs)
-        sec_struct_pred = prob_mat_to_sec_struct(probs=probs, seq=seqs, threshold=threshold)
 
-        #y_true = sec_struct_true[i]
-        y_pred = sec_struct_pred
+        Path('output').mkdir(parents=True, exist_ok=True)
 
-        Path('output/predict_file').mkdir(parents=True, exist_ok=True)
+        for i, seq in enumerate(sequences):
+            prob = probs[i]
+            sec_struct_pred = prob_mat_to_sec_struct(probs=prob, seq=seq, threshold=threshold)
 
-        save_to_ct(Path(output_file), sec_struct=y_pred, seq=seqs)
-        print(f'{seqs}序列预测结构文件保存到{output_file}')
+            output_file = f'output/ss_predict_{i}.ct'
+            save_to_ct(Path(output_file), sec_struct=sec_struct_pred, seq=seq)
+            print(f'{seq} 序列预测结构文件保存到 {output_file}')

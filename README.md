@@ -6,7 +6,7 @@ The untranslated region (UTR) of RNA molecules plays a crucial role in the regul
 At present, the pre-training model tuning has been completed, and the fine-tuning of downstream tasks (MRL, TE, EL) has been completed and the targets have been reached.
 ## Installation
 ```bash
-mamba env create -n env/environment_new.yml
+mamba env create -n env/environment.yml
 ```
 ## Pretrain
 ```bash

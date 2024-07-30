@@ -168,7 +168,7 @@ class RibosomeLoadingPredictionWrapper(pl.LightningModule):
         scheduler = ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.9,
+            factor=0.95,
             patience=5,
             min_lr=5e-6,
         )
@@ -237,7 +237,7 @@ def main(args):
             filename='epoch{epoch:02d}-step{step}-loss={val/loss:.3f}',
             auto_insert_metric_name=False,
             every_n_epochs=1,
-            save_top_k=10,
+            save_top_k=5,
             monitor="val/loss",
             mode="min",
             save_last=False,
