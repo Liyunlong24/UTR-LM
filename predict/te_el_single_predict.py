@@ -2,13 +2,10 @@
 # @Time    : 2024/7/15 16:09
 import os
 import sys
-# 获取当前文件所在目录的绝对路径
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# 获取项目根目录
 project_root = os.path.join(current_dir, '..')
-# 将项目根目录添加到 PYTHONPATH 环境变量
 os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
-# 将项目根目录添加到 sys.path
 sys.path.append(project_root)
 
 import torch
@@ -18,7 +15,6 @@ from utr.config import model_config
 from utr.data.alphabet import Alphabet
 from utr.model.downstream import RibosomeLoadingPredictionHead
 from utr.utils.scaler import StandardScaler
-from torchmetrics.regression import R2Score
 
 lm_config='nano'
 ssmodel_weights_path = './output/teel/teel-epochepoch=09-stepstep=40-loss=val/loss=1.118.ckpt'
@@ -33,7 +29,6 @@ class RibosomeLoadingPredictionModel(nn.Module):
             lr: float = 1e-3,
     ):
         super().__init__()
-        #self.save_hyperparameters()
 
         self.scaler = StandardScaler()
 
@@ -44,11 +39,6 @@ class RibosomeLoadingPredictionModel(nn.Module):
             embed_dim=head_embed_dim,
             num_blocks=head_num_blocks
         )
-
-        self.loss = nn.MSELoss()
-        self.r2_metric = R2Score()
-
-        self.lr = lr
 
         self.pad_idx = self.lm.config['model']['embedding'].padding_idx
 
@@ -66,10 +56,7 @@ class RibosomeLoadingPredictionModel(nn.Module):
 
 if __name__ == '__main__':
 
-    #分词器
     tokenizer = Alphabet()
-
-    #加载模型
     model = RibosomeLoadingPredictionModel(lm_config="nano")
     checkpoint = torch.load(ssmodel_weights_path, map_location='cpu')
 
@@ -94,18 +81,16 @@ if __name__ == '__main__':
     model.load_state_dict(adapted_state_dict,strict=True, assign=False)
     model.to(device)
     model.eval()
-    print('加载模型成功')
+
 
     while True:
 
         seqs = input('请输入 RNA 序列：')   #AUGGCUACGUUAGCUGAACCGUAG
-        #seqs = 'TCAGCGGCCATAATGTCCTCCTCTG'
         inputs = torch.tensor(tokenizer.encode(seqs), dtype=torch.int64).unsqueeze(0).to(device)
 
         with torch.no_grad():
             with torch.cuda.amp.autocast():
                 pred,preds_unscaled= model(inputs)
                 float_value = float(preds_unscaled.item())
-                #print(pred)
                 print(float_value)
 

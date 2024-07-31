@@ -39,7 +39,7 @@ def model_config(name):
         c.training.lr_scheduler.cosine_decay.eta_min = 1e-5
     else:
         raise ValueError("Invalid configuration name!")
-    #确保分词器与config中的一致
+
     assert not any_tokenizer_discrepancies(c), "Found discrepancies in tokenizer configuration!"
 
     return c
@@ -137,7 +137,6 @@ default_config = mlc.ConfigDict(
     }
 )
 
-#以下为从utr移植过来的
 def set_inf(c, inf):
     for k, v in c.items():
         if isinstance(v, mlc.ConfigDict):

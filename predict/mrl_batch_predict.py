@@ -57,14 +57,10 @@ class RibosomeLoadingPredictionModel(nn.Module):
 def load_fasta(fasta_file):
     sequences = []
     max_enc_seq_len = 0
-
     for record in SeqIO.parse(fasta_file, "fasta"):
         seq_str = str(record.seq)
         sequences.append(seq_str)
-
-        # 更新最大长度
         max_enc_seq_len = max(max_enc_seq_len, len(seq_str))
-
     return sequences, max_enc_seq_len
 
 def save_predictions_to_csv(sequences, predictions, output_csv):
@@ -81,12 +77,11 @@ device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 fasta_file = './data/test.fasta'  # 修改为你的fasta文件路径
 output_csv = 'predictions.csv'  # 修改为你希望保存的CSV文件路径
-batch_size = 32  # 设定batch size
+batch_size = 32
 
 if __name__ == '__main__':
 
     sequences, max_enc_seq_len = load_fasta(fasta_file)
-    print(max_enc_seq_len)
     predictions = []
 
     tokenizer = Alphabet()
@@ -113,7 +108,6 @@ if __name__ == '__main__':
     model.load_state_dict(adapted_state_dict, strict=True)
     model.to(device)
     model.eval()
-    print('加载模型成功')
 
     for i in range(0, len(sequences), batch_size):
         batch_seqs = sequences[i:i + batch_size]
@@ -129,6 +123,5 @@ if __name__ == '__main__':
                 float_values = preds_unscaled.cpu().numpy().tolist()
                 predictions.extend(float_values)
 
-    # 保存预测结果到CSV
     save_predictions_to_csv(sequences, predictions, output_csv)
     print('预测结果已保存到', output_csv)

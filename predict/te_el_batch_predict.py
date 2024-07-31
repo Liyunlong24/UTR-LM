@@ -2,14 +2,12 @@
 # @Time    : 2024/7/30 14:49
 import os
 import sys
-# 获取当前文件所在目录的绝对路径
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# 获取项目根目录
 project_root = os.path.join(current_dir, '..')
-# 将项目根目录添加到 PYTHONPATH 环境变量
 os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
-# 将项目根目录添加到 sys.path
 sys.path.append(project_root)
+
 import torch
 import torch.nn as nn
 import csv
@@ -74,13 +72,13 @@ def save_predictions_to_csv(sequences, predictions, output_csv):
             csvwriter.writerow([seq, pred])
 
 lm_config = 'nano'
-ssmodel_weights_path = ' '#需要指定te、el模型文件
+ssmodel_weights_path = ' '
 
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
-fasta_file = './data/test.fasta'  # 修改为你的fasta文件路径
-output_csv = 'predictions.csv'  # 修改为你希望保存的CSV文件路径
-batch_size = 32  # 设定batch size
+fasta_file = './data/test.fasta'
+output_csv = 'predictions.csv'
+batch_size = 32
 
 if __name__ == '__main__':
 
@@ -103,9 +101,9 @@ if __name__ == '__main__':
     adapted_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith('model.'):
-            adapted_state_dict[k[6:]] = v  # 去掉 'model.' 前缀
+            adapted_state_dict[k[6:]] = v
         else:
-            adapted_state_dict[k] = v  # 保持原始键名
+            adapted_state_dict[k] = v
 
     if "threshold" in adapted_state_dict:
         adapted_state_dict.pop("threshold")
@@ -128,6 +126,5 @@ if __name__ == '__main__':
                 float_values = preds_unscaled.cpu().numpy().tolist()
                 predictions.extend(float_values)
 
-    # 保存预测结果到CSV
     save_predictions_to_csv(sequences, predictions, output_csv)
     print('预测结果已保存到', output_csv)

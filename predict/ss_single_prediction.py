@@ -2,14 +2,12 @@
 # @Time    : 2024/7/10 10:06
 import os
 import sys
-# 获取当前文件所在目录的绝对路径
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# 获取项目根目录
 project_root = os.path.join(current_dir, '..')
-# 将项目根目录添加到 PYTHONPATH 环境变量
 os.environ['PYTHONPATH'] = project_root + os.pathsep + os.environ.get('PYTHONPATH', '')
-# 将项目根目录添加到 sys.path
 sys.path.append(project_root)
+
 import torch
 import torch.nn as nn
 from utr.model.model import RiNALMo
@@ -26,16 +24,12 @@ device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 class SecStructPredictionModel(nn.Module):
     def __init__(self, lm_config: str = "nano", num_resnet_blocks: int = 2, lr: float = 1e-5):
         super(SecStructPredictionModel, self).__init__()
-        # 假设 RiNALMo 和 model_config 已经定义并且可以使用
+
         self.lm = RiNALMo(model_config(lm_config))
         self.pred_head = SecStructPredictionHead(
             self.lm.config['model']['transformer'].embed_dim,
             num_blocks=num_resnet_blocks
         )
-        self.loss = nn.BCEWithLogitsLoss()
-
-        # 初始化优化器，这里使用 Adam 作为示例
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
 
     def forward(self, tokens):
         x = self.lm(tokens)["representation"]
@@ -44,10 +38,7 @@ class SecStructPredictionModel(nn.Module):
 
 if __name__ == '__main__':
 
-    #分词器
     tokenizer = Alphabet()
-
-    #加载模型
     model = SecStructPredictionModel(lm_config="nano", num_resnet_blocks=2, lr=1e-5)
     checkpoint = torch.load(ssmodel_weights_path, map_location='cpu')
 
@@ -62,9 +53,9 @@ if __name__ == '__main__':
     adapted_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith('model.'):
-            adapted_state_dict[k[6:]] = v  # 去掉 'model.' 前缀
+            adapted_state_dict[k[6:]] = v
         else:
-            adapted_state_dict[k] = v  # 保持原始键名
+            adapted_state_dict[k] = v
 
     adapted_state_dict.pop("threshold")
 
@@ -77,7 +68,7 @@ if __name__ == '__main__':
 
         seqs = input('请输入 RNA 序列：')   #AUGGCUACGUUAGCUGAACCGUAG
         output_file = 'output/predict_file/ss_predict.ct'
-        #seqs = 'AUGG'
+
         inputs = torch.tensor(tokenizer.encode(seqs), dtype=torch.int64).unsqueeze(0).to(device)
 
         with torch.no_grad():
@@ -93,7 +84,6 @@ if __name__ == '__main__':
         probs = probs[0]
         sec_struct_pred = prob_mat_to_sec_struct(probs=probs, seq=seqs, threshold=threshold)
 
-        #y_true = sec_struct_true[i]
         y_pred = sec_struct_pred
 
         Path('output/predict_file').mkdir(parents=True, exist_ok=True)
