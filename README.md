@@ -1,9 +1,11 @@
 # UTR model pre-training and downstream task fine-tuning
 ## Introduction
 The untranslated region (UTR) of RNA molecules plays a crucial role in the regulation of gene expression. Specifically, the 5' UTR located at the 5' end of the RNA molecule is a key factor in determining the efficiency of RNA translation. This project developed a semi-supervised language model of 5' UTRs that was pretrained on a combined library of random 5' UTRs and endogenous 5' UTRs from multiple species. On the basis of the pre-trained model, some downstream tasks (MRL, TE, EL, SecStructPrediction) were fine-tuned to finally achieve the prediction effect.
+![img.png](img/overview.png)
 ## Project progress
 
 At present, the pre-training model tuning has been completed, and the fine-tuning of downstream tasks (MRL, TE, EL, SS) has also been completed, and the acceptable metric range has been reached, for a single prediction of four downstream tasks and an entire fasta file The function of batch prediction and batch saving has been implemented.
+
 ## Directory Structure
 
 ```
@@ -34,8 +36,11 @@ At present, the pre-training model tuning has been completed, and the fine-tunin
 │   ├── giga_mrl_ft.yaml    # Schedule for fine-tuning of ribosome loading model
 │   ├── giga_sec_struct_ft.yaml  # Schedule for fine-tuning of secondary structure model
 │   └── pretrain.yaml       # Pre-training schedule
-│  
+│
+├── img                     # Illustration picture
+│
 ├── output   # File for prediction results（checkpoints、logs、wandb、predict_result）
+│
 ├── predict
 │   ├── mrl_batch_predict.py    # Script for batch prediction of ribosome loading
 │   ├── mrl_single_predict.py   # Script for single prediction of ribosome loading
@@ -135,7 +140,9 @@ The prediction task is implemented in two forms, a simple single prediction, and
 python3 prdict/... .py
 ```
 ## Result
-Please refer to the document for dataset conditions, detailed training and fine-tuning parameters, and downstream task indicators：
+
+![img.png](img/result.png)
+Please refer to the document for detailed training and fine-tuning parameters, and downstream task indicators：
 
 [UTR-LM Project documentation](https://ab6fpiz688.feishu.cn/docx/TUGxdRBusoxg9fxHEQFczyjnnLh?from=from_copylink)
 
