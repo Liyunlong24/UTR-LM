@@ -142,6 +142,7 @@ python3 prdict/... .py
 ## Result
 
 ![img.png](img/result.png)
+
 Please refer to the document for detailed training and fine-tuning parameters, and downstream task indicators：
 
 [UTR-LM Project documentation](https://ab6fpiz688.feishu.cn/docx/TUGxdRBusoxg9fxHEQFczyjnnLh?from=from_copylink)
